@@ -8,7 +8,7 @@ import com.epson.epos2.discovery.DiscoveryListener
 import com.epson.epos2.discovery.FilterOption
 import com.epson.epos2.printer.Printer
 import com.gthio.epsonplayground.di.IoDispatcher
-import com.gthio.epsonplayground.worker.PrintWorker
+import com.gthio.epsonplayground.worker.PrintCoroutineWorker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.awaitClose
@@ -94,7 +94,7 @@ class PrinterWrapper @Inject constructor(
             val workConstraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
-            val workRequest = OneTimeWorkRequestBuilder<PrintWorker>()
+            val workRequest = OneTimeWorkRequestBuilder<PrintCoroutineWorker>()
                 .setInputData(inputData)
                 .setConstraints(workConstraints)
                 .setBackoffCriteria(
@@ -102,7 +102,6 @@ class PrinterWrapper @Inject constructor(
                     10000,
                     TimeUnit.MILLISECONDS
                 )
-                .setInitialDelay(5, TimeUnit.SECONDS)
                 .build()
             WorkManager.getInstance(context).enqueue(workRequest)
         }

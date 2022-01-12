@@ -3,7 +3,7 @@ package com.gthio.epsonplayground.worker
 import android.content.Context
 import android.util.Log
 import androidx.hilt.work.HiltWorker
-import androidx.work.CoroutineWorker
+import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.epson.epos2.Epos2CallbackCode
 import com.epson.epos2.printer.Printer
@@ -22,9 +22,9 @@ class PrintWorker @AssistedInject constructor(
     @Assisted workerParameters: WorkerParameters,
     private val printerWrapper: PrinterWrapper,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
-) : CoroutineWorker(appContext, workerParameters) {
+) : Worker(appContext, workerParameters) {
 
-    override suspend fun doWork(): Result {
+    override fun doWork(): Result {
         val printerSeries = inputData.getInt("printer_series", Printer.TM_T82)
         val connectionTarget = inputData.getString("connection_target")
         val mPrinter = Printer(printerSeries, Printer.LANG_EN, appContext)
