@@ -2,18 +2,20 @@ package com.gthio.epsonplayground
 
 import android.content.Context
 import android.util.Log
-import com.epson.epos2.Epos2CallbackCode
+import androidx.work.*
 import com.epson.epos2.discovery.Discovery
 import com.epson.epos2.discovery.DiscoveryListener
 import com.epson.epos2.discovery.FilterOption
 import com.epson.epos2.printer.Printer
 import com.gthio.epsonplayground.di.IoDispatcher
+import com.gthio.epsonplayground.worker.PrintWorker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 class PrinterWrapper @Inject constructor(
@@ -50,8 +52,6 @@ class PrinterWrapper @Inject constructor(
         "EU-M30" to Printer.EU_M30
     )
 
-    var mPrinter: Printer? = null
-
     val discoveredPrinters = callbackFlow {
         val printers = hashMapOf<String, String>()
 
@@ -80,77 +80,53 @@ class PrinterWrapper @Inject constructor(
      * Prints a text using the specified printer
      * @param deviceName the device name string (e.g TM-T82)
      * @param connectionTarget the connection target (DeviceInfo.target)
-     * @param textToPrint the text to print
      */
     suspend fun print(
         deviceName: String,
         connectionTarget: String,
-        textToPrint: String
     ) {
         withContext(ioDispatcher) {
-            val mPrinter = Printer(
-                seriesDictionary[deviceName] ?: Printer.TM_T82,
-                Printer.LANG_EN,
-                context
-            )
-            mPrinter.setReceiveEventListener { printer, code, status, jobId ->
-                when (status.connection) {
-                    Printer.FALSE -> {
-                        Log.d("Epos2", "NOT CONNECTED TO PRINTER")
-                    }
-                }
-                when (code) {
-                    Epos2CallbackCode.CODE_SUCCESS -> {
-                        Log.d("Epos2", "Print Success!")
-                        printer.disconnect()
-                        printer.setReceiveEventListener(null)
-                    }
-                    else -> {
-                        Log.d("Epos2", "Print Failed!")
-                        printer.disconnect()
-                        printer.setReceiveEventListener(null)
-                    }
-                }
-            }
-
-            val textData = StringBuilder()
-            mPrinter.clearCommandBuffer()
-            mPrinter.addHeader(textData, "Header")
-            mPrinter.addFeedLine(1)
-            mPrinter.addBody(textData, textToPrint)
-            mPrinter.addFeedLine(1)
-            mPrinter.addCut(Printer.CUT_FEED)
-
             Log.d("Printer", "Connection Target: $connectionTarget")
-            mPrinter.connect(connectionTarget, Printer.PARAM_DEFAULT)
-            mPrinter.sendData(Printer.PARAM_DEFAULT)
-            mPrinter.clearCommandBuffer()
+            val inputData = Data.Builder()
+                .putInt("printer_series", seriesDictionary[deviceName] ?: Printer.TM_T82)
+                .putString("connection_target", connectionTarget)
+                .build()
+            val workConstraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
+            val workRequest = OneTimeWorkRequestBuilder<PrintWorker>()
+                .setInputData(inputData)
+                .setConstraints(workConstraints)
+                .setBackoffCriteria(
+                    BackoffPolicy.LINEAR,
+                    10000,
+                    TimeUnit.MILLISECONDS
+                )
+                .setInitialDelay(5, TimeUnit.SECONDS)
+                .build()
+            WorkManager.getInstance(context).enqueue(workRequest)
         }
     }
+}
 
-    private suspend fun Printer.addHeader(builder: StringBuilder, header: String) {
-        withContext(ioDispatcher) {
-            builder.append(header)
+fun Printer.addHeader(builder: StringBuilder, header: String) {
+    builder.append(header)
 
-            addTextAlign(Printer.ALIGN_CENTER)
-            addText(builder.toString())
-            builder.clear()
-        }
-    }
+    addTextAlign(Printer.ALIGN_CENTER)
+    addText(builder.toString())
+    builder.clear()
+}
 
-    private suspend fun Printer.addBody(builder: StringBuilder, body: String) {
-        withContext(ioDispatcher) {
-            builder.append(body)
-            builder.append("\n")
-            builder.append(body)
-            builder.append("\n")
-            builder.append(body)
-            builder.append("\n")
-            builder.append(body)
+fun Printer.addBody(builder: StringBuilder, body: String) {
+    builder.append(body)
+    builder.append("\n")
+    builder.append(body)
+    builder.append("\n")
+    builder.append(body)
+    builder.append("\n")
+    builder.append(body)
 
-            addTextAlign(Printer.ALIGN_LEFT)
-            addText(builder.toString())
-            builder.clear()
-        }
-    }
+    addTextAlign(Printer.ALIGN_LEFT)
+    addText(builder.toString())
+    builder.clear()
 }

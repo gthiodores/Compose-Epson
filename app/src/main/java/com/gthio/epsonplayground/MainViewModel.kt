@@ -28,7 +28,7 @@ class MainViewModel @Inject constructor(
     fun onPrinterClicked(deviceName: String, target: String) {
         viewModelScope.launch {
             try {
-                printerWrapper.print(deviceName, target, "Lorem ipsum dolor!")
+                printerWrapper.print(deviceName, target)
             } catch (e: Epos2Exception) {
                 Log.d("Epos2Error", "${e.errorStatus}: ${e.printStackTrace()}")
             }
